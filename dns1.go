@@ -1,4 +1,4 @@
-Gpackage main 
+package main 
 import (
         "fmt"
         "time"
@@ -14,14 +14,16 @@ import (
 
 
 type  Storage struct {
-      maptest1   map[string][4]byte
+      addressBookOfA   map[string][4]byte
+      addressBookOfPTR  map[string]string 
       mutex      sync.Mutex
 }
 
 func InitStorage() *Storage {
      return &Storage {
            mutex:sync.Mutex{},
-           maptest1:map[string][4]byte{},
+           addressBookOfA:map[string][4]byte{},
+           addressBookOfPTR:map[string]string{},
      } 
 }
 
@@ -29,7 +31,6 @@ func InitStorage() *Storage {
 
 func (s *Storage )InitData(fname string) {
   f,err := os.Open(fname)
-  fmt.Println(err,"OOO")
      defer f.Close()
 
      if err == nil {
@@ -47,7 +48,12 @@ func (s *Storage )InitData(fname string) {
                  array_line1 := strings.Split(array_line[2],".")
                  fmt.Println(array_line[0],array_line[1],array_line[2],len(array_line1))
                  if len(array_line1) == 4 {
-                    s.maptest1[array_line[0]+array_line[1]]= inet_ntoa(InetAtoN(array_line[2]))
+                    s.addressBookOfA[array_line[0]+array_line[1]]= inet_ntoa(InetAtoN(array_line[2]))
+                    array_line2 :=  strings.Split(array_line[2],".")
+                    if len(array_line2)  == 4 {
+                  fmt.Println(array_line2[3]+"."+array_line2[2]+"."+array_line2[1]+"."+array_line2[0]+".in-addr.arpa.",array_line[1])
+            s.addressBookOfPTR[array_line2[3]+"."+array_line2[2]+"."+array_line2[1]+"."+array_line2[0]+".in-addr.arpa."]=array_line[1]
+                    }
                   
                  }
               }
@@ -63,7 +69,7 @@ func (s *Storage )InitData(fname string) {
 // ServerDNS serve
 func (s *Storage )ServerDNS(addr *net.UDPAddr, conn *net.UDPConn, msg dnsmessage.Message) {
         // query info
-        s.maptest1["172.19.220.208www.baidu.com."]= [4]byte{202,99,160,68}
+        s.addressBookOfA["172.19.220.208www.baidu.com."]= [4]byte{202,99,160,68}
         if len(msg.Questions) < 1 {
                 return
         }
@@ -79,26 +85,56 @@ func (s *Storage )ServerDNS(addr *net.UDPAddr, conn *net.UDPConn, msg dnsmessage
         str1 := fmt.Sprintf("%s", addr) 
         arrary_str1 := strings.Split(str1,":")
         addrIp :=  arrary_str1[0]
-        fmt.Println("ADD",addrIp,queryNameStr)
-        
-
-       k := s.maptest1[addrIp+queryNameStr]
-       fmt.Println("++++++++++++",k)
-       for k1,v1 := range s.maptest1 {
+        fmt.Println(time.Now(),"收到解析IP的请求 源地址",addrIp, "需要解析的字符串", queryNameStr)
+/*        
+       for k1,v1 := range s.addressBookOfA {
            fmt.Println("==============",k1,v1)
         }
+       for k2,v2 := range s.addressBookOfPTR {
+           fmt.Println("==============",k2,v2)
+        }
+
+*/
+
+
         // find record
         var resource dnsmessage.Resource
         switch queryType {
         case dnsmessage.TypeA:
-                if rst, ok := s.maptest1[addrIp+queryNameStr]; ok {
+                if rst, ok := s.addressBookOfA[addrIp+queryNameStr]; ok {
                         resource = NewAResource(queryName, rst)
+                        fmt.Println("1111111111",resource,queryName, rst)
                 } else {
+                        
+                        // 开始请求远程地址解析
+                         rip := GetIp(queryNameStr) 
+                         fmt.Println(time.Now(),"@@@@@@@@@@@@@@远端解析地址如下",queryNameStr,rip)
+                         array_line := strings.Split(rip,".")
+                         if len(array_line)  == 4 {
+                              s.addressBookOfPTR[array_line[3]+"."+array_line[2]+"."+array_line[1]+"."+array_line[0]+".in-addr.arpa."]=queryNameStr
+                              resource = NewAResource(queryName, inet_ntoa(InetAtoN(rip)) )
+                              fmt.Println("222222222",resource,queryName, inet_ntoa(InetAtoN(rip)) )
+                          }
+
+
+
+
+/*
                         fmt.Printf("not fount A record queryName: [%s] \n", queryNameStr)
                         Response(addr, conn, msg)
                         return
+*/
                 }
         case dnsmessage.TypePTR:
+        if rst, ok := s.addressBookOfPTR[queryName.String()]; ok {
+			resource = NewPTRResource(queryName, rst)
+		} else {
+			fmt.Printf("not fount PTR record queryName: [%s] \n", queryNameStr)
+			Response(addr, conn, msg)
+			return
+		}
+
+
         default:
                 fmt.Printf("not support dns queryType: [%s] \n", queryTypeStr)
                 return
@@ -149,8 +185,42 @@ func inet_ntoa(ipnr int64) [4]byte {
     bytes[2] = byte((ipnr >> 8) & 0xFF)
     bytes[1] = byte((ipnr >> 16) & 0xFF)
     bytes[0] = byte((ipnr >> 24) & 0xFF)
-    fmt.Println("++++++++",bytes)
     return  bytes
+}
+
+func NewPTRResource(query dnsmessage.Name, ptr string) dnsmessage.Resource {
+	name, _ := dnsmessage.NewName(ptr)
+	return dnsmessage.Resource{
+		Header: dnsmessage.ResourceHeader{
+			Name:  query,
+			Class: dnsmessage.ClassINET,
+		},
+		Body: &dnsmessage.PTRResource{
+			PTR: name,
+		},
+	}
+}
+
+
+func GetIp(url string)(ips string) {
+
+       var  ip string
+        ns, err := net.LookupHost(url)
+        if err != nil {
+                fmt.Fprintf(os.Stderr, "Err: %s", err.Error())
+                return "0"
+        }
+
+        for _, n := range ns {
+        //      fmt.Fprintf(os.Stdout, "--%s\n", n)
+       //         fmt.Println(url,n)
+                array_line := strings.Split(n,".")
+                if  len(array_line) == 4 {
+                 ip = n
+                } 
+
+        }
+        return strings.Replace(ip,"\n","",-1)
 }
 
 
