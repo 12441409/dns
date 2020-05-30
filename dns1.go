@@ -230,8 +230,8 @@ func GetIp(url string)(ips string) {
 func (s *Storage) ShowA ()(iplist  string) {
     var  str1  string
     for  k,v := range s.addressBookOfA  {
-       fmt.Println("++++++++++++++++",k,"=====" ,string(v[:]))
-       str1 = k+string(v[:])+"\n" +str1
+   //    fmt.Println("++++++++++++++++",k,"=====" ,strings.Trim(strings.Join(strings.Fields(fmt.Sprint([4]byte(v))), "."), "[]"))
+       str1 = k+":"+strings.Trim(strings.Join(strings.Fields(fmt.Sprint([4]byte(v))), "."), "[]")+ "\n" +str1
      }
      return  str1
 }
