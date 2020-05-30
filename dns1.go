@@ -10,6 +10,7 @@ import (
         "net"
         "golang.org/x/net/dns/dnsmessage"
         "math/big"
+        "github.com/gin-gonic/gin"
        )
 
 
@@ -225,10 +226,18 @@ func GetIp(url string)(ips string) {
 
 
 
-func main () {
-     fmt.Println(time.Now(),"开始读数据")
-     Storage := InitStorage()
-     Storage.InitData(os.Args[1])  // 初始化数据到内存
+
+func (s *Storage) ShowA ()(iplist  string) {
+    var  str1  string
+    for  k,v := range s.addressBookOfA  {
+       fmt.Println("++++++++++++++++",k,"=====" ,string(v[:]))
+       str1 = k+string(v[:])+"\n" +str1
+     }
+     return  str1
+}
+ 
+
+func (s *Storage)  StartDns () {
     conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: 53})
         if err != nil {
                 panic(err)
@@ -244,11 +253,22 @@ func main () {
                         fmt.Println(err)
                         continue
                 }
-                go Storage.ServerDNS(addr, conn, msg)
+                go s.ServerDNS(addr, conn, msg)
         }
     
+ }
+func main () {
+         Storage := InitStorage()
+       fmt.Println(time.Now(),"开始读数据")
+       Storage.InitData(os.Args[1]) 
+    go    Storage.StartDns()
 
-
-
+     router := gin.Default()
+     router.GET("/showa" ,func(c *gin.Context){
+        
+       
+     c.String(200,Storage.ShowA())
+     })    
+     router.Run(":80")
 
 }
