@@ -1,4 +1,4 @@
-package main 
+Gpackage main 
 import (
         "fmt"
         "time"
@@ -159,11 +159,6 @@ func main () {
      fmt.Println(time.Now(),"开始读数据")
      Storage := InitStorage()
      Storage.InitData(os.Args[1])  // 初始化数据到内存
-/*
-     for k,v := range Storage.maptest1 {
-        fmt.Println(k,v)
-     }
-*/
     conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: 53})
         if err != nil {
                 panic(err)
