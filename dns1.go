@@ -104,7 +104,6 @@ func (s *Storage )ServerDNS(addr *net.UDPAddr, conn *net.UDPConn, msg dnsmessage
         case dnsmessage.TypeA:
                 if rst, ok := s.addressBookOfA[addrIp+queryNameStr]; ok {
                         resource = NewAResource(queryName, rst)
-                        fmt.Println("1111111111",resource,queryName, rst)
                 } else {
                         
                         // 开始请求远程地址解析
@@ -112,9 +111,10 @@ func (s *Storage )ServerDNS(addr *net.UDPAddr, conn *net.UDPConn, msg dnsmessage
                          fmt.Println(time.Now(),"@@@@@@@@@@@@@@远端解析地址如下",queryNameStr,rip)
                          array_line := strings.Split(rip,".")
                          if len(array_line)  == 4 {
+                              s.mutex.Lock()
                               s.addressBookOfPTR[array_line[3]+"."+array_line[2]+"."+array_line[1]+"."+array_line[0]+".in-addr.arpa."]=queryNameStr
+                             s.mutex.Unlock()
                               resource = NewAResource(queryName, inet_ntoa(InetAtoN(rip)) )
-                              fmt.Println("222222222",resource,queryName, inet_ntoa(InetAtoN(rip)) )
                           }
 
 
@@ -213,7 +213,6 @@ func GetIp(url string)(ips string) {
         }
 
         for _, n := range ns {
-        //      fmt.Fprintf(os.Stdout, "--%s\n", n)
        //         fmt.Println(url,n)
                 array_line := strings.Split(n,".")
                 if  len(array_line) == 4 {
@@ -230,8 +229,16 @@ func GetIp(url string)(ips string) {
 func (s *Storage) ShowA ()(iplist  string) {
     var  str1  string
     for  k,v := range s.addressBookOfA  {
-   //    fmt.Println("++++++++++++++++",k,"=====" ,strings.Trim(strings.Join(strings.Fields(fmt.Sprint([4]byte(v))), "."), "[]"))
        str1 = k+":"+strings.Trim(strings.Join(strings.Fields(fmt.Sprint([4]byte(v))), "."), "[]")+ "\n" +str1
+     }
+     return  str1
+}
+
+
+func (s *Storage) ShowPTR ()(iplist  string) {
+    var  str1  string
+    for  k,v := range s.addressBookOfPTR   {
+       str1 = k+":"+v+"\n" +str1
      }
      return  str1
 }
@@ -265,10 +272,26 @@ func main () {
 
      router := gin.Default()
      router.GET("/showa" ,func(c *gin.Context){
-        
-       
      c.String(200,Storage.ShowA())
      })    
+     
+     router.GET("/showPTR" ,func(c *gin.Context){
+     c.String(200,Storage.ShowPTR())
+     })
+
+
+    router.GET("/adda" ,func(c *gin.Context){
+       sip := c.Query("sip")
+       dname := c.Query("dname")
+       dip := c.Query("dip")
+       Storage.mutex.Lock()
+       Storage.addressBookOfA[dip+dname]= inet_ntoa(InetAtoN(sip))
+       Storage.addressBookOfPTR[dip+".in-addr.arpa."]=dname+"."
+       Storage.mutex.Unlock()
+       c.String(200,"OK")
+          
+    })
+  
      router.Run(":80")
 
 }
