@@ -285,7 +285,7 @@ func main () {
        dname := c.Query("dname")
        dip := c.Query("dip")
        Storage.mutex.Lock()
-       Storage.addressBookOfA[dip+dname]= inet_ntoa(InetAtoN(sip))
+       Storage.addressBookOfA[sip+dname]= inet_ntoa(InetAtoN(dip))
        Storage.addressBookOfPTR[dip+".in-addr.arpa."]=dname+"."
        Storage.mutex.Unlock()
        c.String(200,"OK")
